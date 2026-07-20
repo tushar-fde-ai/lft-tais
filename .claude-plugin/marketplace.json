@@ -1,0 +1,15 @@
+{
+  "name": "lufthansa-custom-aa",
+  "owner": {
+    "name": "tushar-fde-ai"
+  },
+  "description": "Lufthansa Group Custom Audience Agent — marketing segmentation, audience creation, and data exploration for LHG CDP",
+  "plugins": [
+    {
+      "name": "lhg-audience",
+      "source": "./plugins/lhg-audience",
+      "description": "LHG audience segmentation — custom audiences, macro audiences, data discovery, and policy review",
+      "version": "1.0.0"
+    }
+  ]
+}

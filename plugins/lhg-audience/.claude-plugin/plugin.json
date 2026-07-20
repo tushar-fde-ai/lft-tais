@@ -1,0 +1,8 @@
+{
+  "name": "lhg-audience",
+  "description": "Lufthansa Group audience segmentation — create custom audiences, explore customer data, and validate against segmentation policy",
+  "version": "1.0.0",
+  "author": {
+    "name": "tushar-fde-ai"
+  }
+}
