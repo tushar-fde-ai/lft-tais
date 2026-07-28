@@ -7,11 +7,21 @@ description: LHG-specific segment creation skill. Identical YAML syntax to the g
 
 Parent segment context is already set to `cdp_lhg_unified_first_party`. Do NOT run `tdx sg use` or `tdx sg pull` — pulling a 24.3M row parent segment is slow and unnecessary.
 
+## File Location
+
+Before writing any YAML, determine the output folder:
+
+1. If a folder has already been established in this session, use it
+2. Otherwise, ask the user: "Would you like me to create a new folder or use an existing one?"
+3. Default folder name (if creating new): `Treasure AI Studio Segments`
+
+All segment YAML files go into this folder as `<segment-name-kebab-case>.yml`.
+
 ## Workflow
 
 **Process one segment at a time.** For each segment:
 
-1. **Write** the YAML file directly
+1. **Write** the YAML file to the established folder
 2. **Validate** with `tdx sg validate <file>`
 3. **Server validate** with `tdx sg push --dry-run "<file>"` — catches field/schema errors
 4. **Preview** with `preview_segment` tool — get user approval before proceeding
