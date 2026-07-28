@@ -22,10 +22,14 @@ All segment YAML files go into this folder as `<segment-name-kebab-case>.yml`.
 **Process one segment at a time.** For each segment:
 
 1. **Write** the YAML file to the established folder
-2. **Validate** with `tdx sg validate <file>`
-3. **Server validate** with `tdx sg push --dry-run "<file>"` — catches field/schema errors
-4. **Preview** with `preview_segment` tool — get user approval before proceeding
-5. **Push** with `tdx sg push -y "<file>"` — always specify the file path explicitly
+2. **Pre-push nesting check** — count Composite levels in the YAML before proceeding:
+   - If any Composite contains another Composite that itself contains another Composite → 3 levels → **stop, flatten to DNF first** (see below)
+   - Maximum 2 levels. Pushing a 3-level structure will succeed but render blank in Console UI
+3. **Validate** with `tdx sg validate <file>`
+   - Run from any directory — pass the full or relative path. No `cd`, no `tdx.json` needed
+4. **Server validate** with `tdx sg push --dry-run "<file>"` — catches field/schema errors
+5. **Preview** with `preview_segment` tool — get user approval before proceeding
+6. **Push** with `tdx sg push -y "<file>"` — always specify the file path explicitly
 
 Never batch multiple segments in validate or push operations.
 
@@ -37,7 +41,7 @@ https://console.treasuredata.com/app/audiences/<parent_id>/segments/<segment_id>
 ## Core Commands
 
 ```bash
-tdx sg validate <file>               # Local YAML validation (fast)
+tdx sg validate <file>               # Local YAML validation — works on any path, no tdx.json needed
 tdx sg push --dry-run "<file>"       # Server-side validation (no pull needed)
 tdx sg push -y "<file>"              # Push specific file (-y for non-interactive)
 tdx sg list                          # List segments
@@ -59,13 +63,16 @@ If you need a count check, write a direct SQL query against `cdp_audience_115951
 
 **NEVER use `type: And` or `type: Or` as a condition.** The Console UI renders them as blank/empty rules. This applies at every depth. If you need boolean grouping, use `type: Composite` with an `expr` field — always.
 
-**`filter.type: And` inside behavior conditions is SAFE.** The blank-render bug only applies to `rule.conditions` and `Composite.conditions` nesting. Behavior filter blocks use `type: Column` conditions and are rendered independently by the Console.
+**`filter.type: And` inside behavior conditions is SAFE — and it is the ONLY supported filter type.** `filter.type: Or` is not supported server-side and will cause a validation error. The blank-render bug only applies to `rule.conditions` and `Composite.conditions` nesting — behavior filter blocks are unaffected.
 
 ### expr Reference
 
-- **Top-level** `rule.type: Composite` — reference conditions by **number** (1-indexed): `"1 and 2 and (3 or 4)"`
+- **Top-level** `rule.type: Composite` — ALWAYS reference conditions by **number** (1-indexed), regardless of how many branches there are:
+  - 2 branches: `"(1 or 2)"`
+  - 6 branches: `"(1 or 2 or 3 or 4 or 5 or 6)"`
+  - Mixed: `"1 and (2 or 3 or 4)"`
+  - **NEVER use letters at the top level** — this causes HTTP 400 "Referenced rule set does not exist"
 - **Nested** `Composite` inside another Composite — reference by **letter** (A=first, B=second…): `"(A or B or C)"`
-- **Third level** — same letter convention restarts: `"(A and B)"`
 
 ### Maximum Depth: 2 Composite Levels
 
