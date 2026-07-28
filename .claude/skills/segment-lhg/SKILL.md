@@ -13,8 +13,7 @@ Parent segment context is already set to `cdp_lhg_unified_first_party`. Do NOT r
 
 1. **Write** the YAML file directly
 2. **Validate** with `tdx sg validate <file>`
-3. **Count check** — run `tdx sg sql --path <file> | tdx query -` and verify count > 0
-   - If count is 0, the rule is too restrictive — revise before proceeding
+3. **Server validate** with `tdx sg push --dry-run "<file>"` — catches field/schema errors
 4. **Preview** with `preview_segment` tool — get user approval before proceeding
 5. **Push** with `tdx sg push -y "<file>"` — always specify the file path explicitly
 
@@ -28,18 +27,23 @@ https://console.treasuredata.com/app/audiences/<parent_id>/segments/<segment_id>
 ## Core Commands
 
 ```bash
-# DO NOT RUN:
-# tdx sg use "cdp_lhg_unified_first_party"   ← slow, unnecessary
-# tdx sg pull "cdp_lhg_unified_first_party"  ← pulls 24.3M row segment
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │ DO NOT RUN — these pull the entire 24.3M row parent segment:        │
+# │   tdx sg use "cdp_lhg_unified_first_party"                         │
+# │   tdx sg pull "cdp_lhg_unified_first_party"                        │
+# │   tdx sg sql --path <file>   ← REQUIRES a pulled project folder    │
+# └─────────────────────────────────────────────────────────────────────┘
 
 # Use these instead:
-tdx sg validate <file>               # Validate specific file locally
-tdx sg push --dry-run "<file>"       # Server-side validation
+tdx sg validate <file>               # Local YAML validation (fast)
+tdx sg push --dry-run "<file>"       # Server-side validation (no pull needed)
 tdx sg push -y "<file>"              # Push specific file (-y for non-interactive)
 tdx sg list                          # List segments
 tdx sg list -r                       # Recursive tree view
 tdx sg fields                        # List available fields
 ```
+
+**Why no `tdx sg sql --path`?** That command requires a project directory created by `tdx sg pull`. Pulling creates a `segments/` folder with the entire parent segment tree (24.3M rows) — exactly what we want to avoid. Use `--dry-run` for server validation instead. If you need a count check, write a direct SQL query against `cdp_audience_1159510` using the same conditions from the YAML.
 
 ---
 
