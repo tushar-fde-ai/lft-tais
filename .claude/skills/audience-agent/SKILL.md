@@ -38,8 +38,9 @@ When handling requests, prioritize:
 - Output database: `cdp_audience_1159510`
 - Key data tables:
   - `customers` — customer attributes (demographics, permissions, loyalty)
-  - `behavior_pnr_leg` — flight leg detail (cabin, carrier, route, leg destination)
-  - `behavior_pnr` — booking header (PNR-level: trip reason, booking status, origin/dest)
+  - `behavior_pnr_data` — booking-level data (PNR records, status, trip reason)
+  - `behavior_flight_leg` — individual flight legs (cabin, carrier, route)
+  - ⚠️ Verify actual table names with `tdx query "SHOW TABLES IN cdp_audience_1159510"` — names differ between the old and current database
   - `behavior_ancillary_data` — ancillary purchases (seats, bags, upgrades, lounges)
   - `behavior_web_all_events_stitched` — web interaction events (searches, clicks)
 

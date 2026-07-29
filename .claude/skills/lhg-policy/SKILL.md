@@ -39,18 +39,18 @@ description: Single source of truth for all LHG segmentation rules and policy. L
 
 ### 2.1 When to use each table
 
-**Bookings table (`behavior_pnr_leg`) — booking-level:**
+**Bookings table — booking-level:**
 - Trip reason, origin & destination of booking, booking status
 - Aggregation: COUNT
 
-**Flight_Leg table (`behavior_pnr_leg`) — flight leg level:**
+**Flight_Leg table — flight leg level:**
 - Cabin, leg destination, operating carrier, any attribute at individual leg level
 - Aggregation: COUNT_DISTINCT by tvl_txn_id
 
-> **Note:** The booking header table is `behavior_pnr` (PNR-level summary). The flight leg detail table is `behavior_pnr_leg`. There is no `behavior_pnr_data` or `behavior_flight_leg` table in `cdp_audience_1159510` — these names do not exist and queries against them will fail silently.
+> **Warning:** Table names in `cdp_audience_1159510` differ from the older `cdp_audience_841858` database. Do NOT assume `behavior_pnr_data` or `behavior_flight_leg` — these may not exist. Always verify with `tdx query "SHOW TABLES IN cdp_audience_1159510"` before building behavior conditions.
 
-Rule: whole booking attributes = Bookings (`behavior_pnr`, COUNT). Flight leg attributes = Flight_Leg (`behavior_pnr_leg`, COUNT_DISTINCT by tvl_txn_id).
-Prefer `behavior_pnr_leg` over `behavior_pnr` unless a booking-level attribute is specifically needed.
+Rule: whole booking attributes = Bookings (COUNT). Flight leg attributes = Flight_Leg (COUNT_DISTINCT by tvl_txn_id).
+Prefer the Flight_Leg table over the Bookings table unless a booking-level attribute is specifically needed.
 
 ### 2.2 Origin & Destination field mapping
 - `airpt` in column name = Bookings table; `airport` = Flight_Leg table
@@ -66,7 +66,7 @@ Prefer `behavior_pnr_leg` over `behavior_pnr` unless a booking-level attribute i
 - Validate with:
   ```sql
   SELECT bkg_dest_cntry_cd, COUNT(*)
-  FROM cdp_audience_1159510.behavior_pnr_leg
+  FROM cdp_audience_1159510.behavior_pnr_data
   WHERE dest_traffic_area_cd = '<area>'
   GROUP BY 1
   ORDER BY 2 DESC

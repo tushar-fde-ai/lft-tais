@@ -183,7 +183,7 @@ Query behavior table data with aggregations. Use `type: Value` with `source`, `a
 # Sum revenue for confirmed PNR bookings in last 90 days
 - type: Value
   attribute: ""                           # Always empty string for behavior aggregations
-  source: behavior_pnr_leg                 # behavior_<table_name> (prefix required)
+  source: behavior_pnr_data               # behavior_<table_name> (prefix required)
   aggregation:
     type: Sum                             # Count | Sum | Average | Min | Max
     column: revenue_amount                # Required for Sum/Average/Min/Max (omit for Count)
@@ -359,7 +359,7 @@ rule:
                 value: "+39"
         - type: Value                        # B — Top 10% spenders
           attribute: ""
-          source: behavior_pnr_leg
+          source: behavior_pnr_data
           aggregation:
             type: Sum
             column: revenue_amount
@@ -421,7 +421,7 @@ rule:
                 value: "+39"
         - type: Value                        # B — Top 10% spenders (same)
           attribute: ""
-          source: behavior_pnr_leg
+          source: behavior_pnr_data
           aggregation:
             type: Sum
             column: revenue_amount
@@ -478,7 +478,7 @@ rule:
                 value: "+39"
         - type: Value                        # B — Top 10% spenders
           attribute: ""
-          source: behavior_pnr_leg
+          source: behavior_pnr_data
           aggregation:
             type: Sum
             column: revenue_amount
@@ -559,7 +559,7 @@ rule:
                 value: "+39"
         - type: Value                        # B — Top 10% spenders
           attribute: ""
-          source: behavior_pnr_leg
+          source: behavior_pnr_data
           aggregation:
             type: Sum
             column: revenue_amount
