@@ -5,19 +5,22 @@ description: LHG segment creation — full YAML syntax, operators, Composite/exp
 
 # LHG Segment Creation
 
-Parent segment context is already set to `cdp_lhg_unified_first_party`. Do NOT run `tdx sg use` or `tdx sg pull` — pulling a 24.3M row parent segment is slow and unnecessary.
+**MANDATORY FIRST STEP — run this once per session to create the project folder:**
+```bash
+tdx sg pull "cdp_lhg_unified_first_party"
+```
+This creates a `segments/cdp_lhg_unified_first_party/` folder with a `tdx.json` file. The `tdx.json` is required for `tdx sg validate` and `tdx sg push` to work. Run this once — subsequent segments go into the same folder.
 
 ---
 
 ## Section 1: File Location
 
-Before writing any YAML, determine the output folder:
+All segment YAML files go into the folder created by `tdx sg pull`:
+```
+segments/cdp_lhg_unified_first_party/<segment-name-kebab-case>.yml
+```
 
-1. If a folder has already been established in this session, use it
-2. Otherwise, ask the user: "Would you like me to create a new folder or use an existing one?"
-3. Default folder name (if creating new): `Treasure AI Studio Segments`
-
-All segment YAML files go into this folder as `<segment-name-kebab-case>.yml`.
+If the folder doesn't exist yet, run the pull command from the mandatory first step above.
 
 ---
 
@@ -25,15 +28,16 @@ All segment YAML files go into this folder as `<segment-name-kebab-case>.yml`.
 
 **Process one segment at a time.** For each segment:
 
-1. **Write** the YAML file to the established folder
-2. **Pre-push nesting check** — count Composite levels in the YAML before proceeding:
+1. **Pull** (once per session) — `tdx sg pull "cdp_lhg_unified_first_party"` to create project folder with `tdx.json`
+2. **Write** the YAML file into the pulled folder (`segments/cdp_lhg_unified_first_party/`)
+3. **Pre-push nesting check** — count Composite levels in the YAML before proceeding:
    - If any Composite contains another Composite that itself contains another Composite → 3 levels → **stop, flatten to DNF first** (see Section 11)
    - Maximum 2 levels. Pushing a 3-level structure will succeed but render blank in Console UI
-3. **Validate** with `tdx sg validate <file>`
-   - Run from any directory — pass the full or relative path. No `cd`, no `tdx.json` needed
-4. **Server validate** with `tdx sg push --dry-run "<file>"` — catches field/schema errors
-5. **Preview** with `preview_segment` tool — get user approval before proceeding
-6. **Push** with `tdx sg push -y "<file>"` — always specify the file path explicitly
+4. **Validate** with `tdx sg validate <file>`
+5. **Count check** — run `tdx sg sql --path <file> | tdx query -` and verify count > 0
+   - If count is 0, the rule is too restrictive — revise before proceeding
+6. **Preview** with `preview_segment` tool — get user approval before proceeding
+7. **Push** with `tdx sg push -y "<file>"` — always specify the file path explicitly
 
 Never batch multiple segments in validate or push operations.
 
@@ -47,15 +51,17 @@ https://console.treasuredata.com/app/audiences/<parent_id>/segments/<segment_id>
 ## Section 3: Core Commands
 
 ```bash
-tdx sg validate <file>               # Local YAML validation — works on any path, no tdx.json needed
-tdx sg push --dry-run "<file>"       # Server-side validation (no pull needed)
+tdx sg pull "cdp_lhg_unified_first_party"  # Run once — creates project folder with tdx.json
+tdx sg validate <file>               # Local YAML validation (file must be inside pulled folder)
+tdx sg push --dry-run "<file>"       # Server-side validation
 tdx sg push -y "<file>"              # Push specific file (-y for non-interactive)
 tdx sg list                          # List segments
 tdx sg list -r                       # Recursive tree view
 tdx sg fields                        # List available fields
+tdx sg sql --path <file> | tdx query -  # Count check (file must be inside pulled folder)
 ```
 
-If you need a count check, write a direct SQL query against `cdp_audience_1159510` using the same conditions from the YAML.
+For count checks, use `tdx sg sql --path <file> | tdx query -` to verify segment size > 0 before pushing. Alternatively, write a direct SQL query against `cdp_audience_1159510` using the same conditions from the YAML.
 
 ---
 
@@ -86,13 +92,14 @@ To reduce push time:
 
 ## Section 5: YAML Structure
 
+### Simple segment (all conditions AND'd together):
+
 ```yaml
 name: High Value Customers          # Required
 kind: batch                         # batch | realtime | funnel_stage
 
 rule:
-  type: Composite                   # Use Composite for all boolean grouping (see Section 11)
-  expr: "1 and (2 or 3)"
+  type: And
   conditions:
     - type: Value
       attribute: country
@@ -112,6 +119,42 @@ rule:
         unit: day
 ```
 
+### Multi-branch segment (OR of AND-groups):
+
+```yaml
+name: Premium Customers - Multi Channel
+kind: batch
+
+rule:
+  type: Composite
+  expr: "(1 or 2)"
+  conditions:
+    - type: And
+      conditions:
+        - type: Value
+          attribute: country
+          operator:
+            type: Equal
+            value: "DE"
+        - type: Value
+          attribute: ltv
+          operator:
+            type: Greater
+            value: 1000
+    - type: And
+      conditions:
+        - type: Value
+          attribute: country
+          operator:
+            type: Equal
+            value: "AT"
+        - type: Value
+          attribute: ltv
+          operator:
+            type: Greater
+            value: 500
+```
+
 **`kind` values:**
 - `batch` — standard scheduled evaluation
 - `realtime` — real-time profile evaluation
@@ -121,18 +164,51 @@ rule:
 
 ## Section 6: Condition Types
 
-Five condition types can appear inside `conditions` arrays:
+What is valid inside `conditions` depends on the **parent context**:
+
+### When `rule.type` is `Composite` (top-level with `expr`):
+
+| Type | Purpose |
+|------|---------|
+| `And` | Branch where all conditions must match (NO `expr` field) |
+| `Or` | Branch where any condition must match (NO `expr` field) |
+| `Value` | Filter by attribute column; also used for behavior queries (with `source`) |
+| `include` | Reference another segment (include its members) |
+| `exclude` | Reference another segment (exclude its members) |
+
+**`type: Composite` with `expr` is NOT valid here** — the server rejects nested Composite inside a top-level Composite.
+
+### When `rule.type` is `And` or `Or` (top-level without `expr`):
 
 | Type | Purpose |
 |------|---------|
 | `Value` | Filter by attribute column; also used for behavior queries (with `source`) |
-| `Composite` | Boolean grouping with `expr` — the ONLY way to nest logic |
+| `Composite` | Boolean grouping with `expr` (numbers for conditions) |
 | `include` | Reference another segment (include its members) |
 | `exclude` | Reference another segment (exclude its members) |
 
-**HARD RULE: `type: And` and `type: Or` are NOT valid inside `conditions` arrays.** They render as blank/empty rules in the Console UI. Use `type: Composite` with an `expr` field for all boolean grouping — always.
+**`type: And` / `type: Or` are NOT valid here** — they render as blank/empty rules in the Console UI.
 
-The only place `And` and `Or` appear in valid YAML is `rule.type: And` / `rule.type: Or` at the top level (not inside a conditions array), or `filter.type: And` inside behavior conditions. The latter is safe; the former causes blank rendering.
+### Inside an `And`/`Or` branch (inside a top-level Composite):
+
+| Type | Purpose |
+|------|---------|
+| `Value` | Filter by attribute column; also used for behavior queries (with `source`) |
+| `include` | Reference another segment (include its members) |
+| `exclude` | Reference another segment (exclude its members) |
+
+**No further nesting** — you cannot put `Composite`, `And`, or `Or` inside a branch's conditions. All OR logic must be fully flattened into separate top-level branches.
+
+### Summary table
+
+| Level | Valid types | `expr` field |
+|-------|------------|--------------|
+| `rule:` | `And`, `Or`, `Composite` | Only when `type: Composite` |
+| Inside `rule.conditions` when rule is `Composite` | `And`, `Or`, `Value`, `include`, `exclude` | **NOT valid** |
+| Inside `rule.conditions` when rule is `And`/`Or` | `Composite`, `Value`, `include`, `exclude` | Only on `Composite` |
+| Inside a branch (`And`/`Or`) of a top-level `Composite` | `Value`, `include`, `exclude` | **NOT valid** |
+
+**`filter.type: And` inside behavior conditions is SAFE — and it is the ONLY supported filter type.** `filter.type: Or` is not supported server-side and will cause a validation error.
 
 ---
 
@@ -257,107 +333,89 @@ Invalid keys or formats trigger `INVALID_ARRAY_MATCHING`.
 
 ---
 
-## Section 11: Composite/expr — Mandatory for All Boolean Grouping
+## Section 11: Composite/expr — Multi-Branch Segments
 
-**HARD RULE:** Inside any `conditions` array (top-level `rule.conditions` or nested `Composite.conditions`), the ONLY valid condition types are:
+### The Two Valid Patterns
 
-- `Value` (attributes and behavior aggregations)
-- `Composite` (boolean grouping)
-- `include` / `exclude` (segment references)
-
-**NEVER use `type: And` or `type: Or` as a condition.** The Console UI renders them as blank/empty rules. This applies at every depth. If you need boolean grouping, use `type: Composite` with an `expr` field — always.
-
-**`filter.type: And` inside behavior conditions is SAFE — and it is the ONLY supported filter type.** `filter.type: Or` is not supported server-side and will cause a validation error. The blank-render bug only applies to `rule.conditions` and `Composite.conditions` nesting — behavior filter blocks are unaffected.
-
-### expr Reference
-
-- **Top-level** `rule.type: Composite` — ALWAYS reference conditions by **number** (1-indexed), regardless of how many branches there are:
-  - 2 branches: `"(1 or 2)"`
-  - 6 branches: `"(1 or 2 or 3 or 4 or 5 or 6)"`
-  - Mixed: `"1 and (2 or 3 or 4)"`
-  - **NEVER use letters at the top level** — this causes HTTP 400 "Referenced rule set does not exist"
-- **Nested** `Composite` inside another Composite — reference by **letter** (A=first, B=second…): `"(A or B or C)"`
-
-### Maximum Depth: 2 Composite Levels
-
-The Console reliably renders up to **2 levels** of Composite nesting (top-level Composite containing nested Composites). If your logic requires 3+ levels, **flatten to 2 levels using DNF** (Disjunctive Normal Form — OR of AND-groups).
-
-**Flattening pattern:**
-
-Before (3 levels — risky):
-```
-X AND (D OR E OR (F1 AND F2) OR (G1 AND G2))
+**Pattern A — Simple (single boolean, no branching):**
+```yaml
+rule:
+  type: And          # or Or
+  conditions:
+    - type: Value
+      ...
+    - type: Value
+      ...
 ```
 
-After (2 levels — safe):
-```
-(X AND D) OR (X AND E) OR (X AND F1 AND F2) OR (X AND G1 AND G2)
-```
-
-Then express the flattened form as:
+**Pattern B — Multi-branch (OR of AND-groups, or complex boolean):**
 ```yaml
 rule:
   type: Composite
-  expr: "(1 or 2 or 3 or 4)"       # 4 OR branches, each is an AND-group (numbers at top level)
+  expr: "(1 or 2 or 3)"          # ALWAYS numbers at top level
   conditions:
-    - type: Composite               # branch 1
-      expr: "(A and B)"             # X AND D
-      conditions: [...]
-    - type: Composite               # branch 2
-      expr: "(A and B)"             # X AND E
-      conditions: [...]
-    - type: Composite               # branch 3
-      expr: "(A and B and C)"       # X AND F1 AND F2
-      conditions: [...]
-    - type: Composite               # branch 4
-      expr: "(A and B and C)"       # X AND G1 AND G2
-      conditions: [...]
+    - type: And                   # branch 1 — And/Or, NO expr field
+      conditions:
+        - type: Value
+          ...
+        - type: Value
+          ...
+    - type: And                   # branch 2
+      conditions:
+        - type: Value
+          ...
+    - type: And                   # branch 3
+      conditions:
+        - type: Value
+          ...
 ```
 
-### Complex Example — Italian High-Spender Flight Searchers
+### Hard Rules
 
-Request: "Italian customers (by residency OR phone number) AND top 10% spenders (2 years) AND ≥2 flight searches in 90 days (web OR app OR 1 each OR different brand websites)"
+1. **`expr` is only valid on the top-level `rule` when `type: Composite`** — never on branches inside it
+2. **Branches inside a top-level Composite must be `type: And` or `type: Or`** — never `type: Composite`
+3. **No nesting inside branches** — branches contain only `Value`, `include`, and `exclude` conditions. If you need OR logic within a branch (e.g. country = IT OR phone = +39), flatten it into separate top-level branches instead
+4. **Top-level `expr` uses numbers** (1-indexed): `"(1 or 2 or 3)"`, `"1 and (2 or 3)"`
+5. **NEVER use letters in top-level `expr`** — causes HTTP 400 "Referenced rule set does not exist"
 
-Logical structure: `(A OR B) AND C AND (D OR E OR (F1 AND F2) OR (G1 AND G2))`
+### `filter.type: And` inside behavior conditions
 
-This has 3 levels — flatten the inner OR group by distributing `(A OR B) AND C` into each branch:
+This is SAFE and is the ONLY supported filter type. `filter.type: Or` is not supported server-side. The nesting restrictions above apply only to `rule.conditions` — behavior filter blocks are unaffected.
 
-Final structure (2 levels max):
+### Flattening — OR Within a Branch
+
+If your logic has OR conditions within an AND-group, you MUST flatten by creating separate branches.
+
+**Example:** "Italian customers (by country OR phone) AND top spenders AND web searchers"
+
+Logical structure: `(A OR B) AND C AND D`
+
+This cannot be expressed as one branch with nested OR. Flatten to separate branches:
+
 ```
-( (A OR B) AND C AND D ) OR ( (A OR B) AND C AND E ) OR ( (A OR B) AND C AND F1 AND F2 ) OR ( (A OR B) AND C AND G1 AND G2 )
+(A AND C AND D) OR (B AND C AND D)
 ```
-
-Since `(A OR B)` repeats in every branch, keep it as a nested Composite inside each:
 
 ```yaml
 name: Italian High-Spender Flight Searchers
 kind: batch
 description: >
-  Italian customers (residency or phone) who are top 10% spenders over 2 years
-  and had ≥2 flight searches in last 90 days across web/app/multi-brand.
+  Italian customers (by country or phone prefix) who are top 10% spenders
+  and searched flights on the web in last 90 days.
 
 rule:
   type: Composite
-  expr: "(1 or 2 or 3 or 4)"
+  expr: "(1 or 2)"
   conditions:
-    # Branch 1: Italian + Top spender + ≥2 web searches
-    - type: Composite
-      expr: "(A and B and C)"
+    # Branch 1: Italian by country + Top spender + Web searcher
+    - type: And
       conditions:
-        - type: Composite                    # A — Italian identification
-          expr: "(A or B)"
-          conditions:
-            - type: Value
-              attribute: cntry_cd
-              operator:
-                type: Equal
-                value: "it"
-            - type: Value
-              attribute: phone_cntry_cd
-              operator:
-                type: Equal
-                value: "+39"
-        - type: Value                        # B — Top 10% spenders
+        - type: Value
+          attribute: cntry_cd
+          operator:
+            type: Equal
+            value: "it"
+        - type: Value
           attribute: ""
           source: behavior_pnr_leg
           aggregation:
@@ -365,7 +423,7 @@ rule:
             column: revenue_amount
           operator:
             type: GreaterEqual
-            value: 5000                      # Proxy for top 10% threshold
+            value: 5000
           timeWindow:
             duration: 730
             unit: day
@@ -377,7 +435,7 @@ rule:
                 operator:
                   type: Equal
                   value: "K"
-        - type: Value                        # C — ≥2 web searches (LH/SN bucket)
+        - type: Value
           attribute: ""
           source: behavior_web_all_events_stitched
           aggregation:
@@ -402,24 +460,15 @@ rule:
                   type: In
                   value: ["flma", "flightmanager"]
 
-    # Branch 2: Italian + Top spender + ≥2 app searches
-    - type: Composite
-      expr: "(A and B and C)"
+    # Branch 2: Italian by phone + Top spender + Web searcher (same C and D, different A)
+    - type: And
       conditions:
-        - type: Composite                    # A — Italian (same as above)
-          expr: "(A or B)"
-          conditions:
-            - type: Value
-              attribute: cntry_cd
-              operator:
-                type: Equal
-                value: "it"
-            - type: Value
-              attribute: phone_cntry_cd
-              operator:
-                type: Equal
-                value: "+39"
-        - type: Value                        # B — Top 10% spenders (same)
+        - type: Value
+          attribute: phone_cntry_cd
+          operator:
+            type: Equal
+            value: "+39"
+        - type: Value
           attribute: ""
           source: behavior_pnr_leg
           aggregation:
@@ -439,7 +488,7 @@ rule:
                 operator:
                   type: Equal
                   value: "K"
-        - type: Value                        # C — ≥2 app searches
+        - type: Value
           attribute: ""
           source: behavior_web_all_events_stitched
           aggregation:
@@ -454,186 +503,23 @@ rule:
             type: And
             conditions:
               - type: Column
-                column: tealium_event
-                operator:
-                  type: Equal
-                  value: "click booking search button"
-
-    # Branch 3: Italian + Top spender + 1 web + 1 app
-    - type: Composite
-      expr: "(A and B and C and D)"
-      conditions:
-        - type: Composite                    # A — Italian
-          expr: "(A or B)"
-          conditions:
-            - type: Value
-              attribute: cntry_cd
-              operator:
-                type: Equal
-                value: "it"
-            - type: Value
-              attribute: phone_cntry_cd
-              operator:
-                type: Equal
-                value: "+39"
-        - type: Value                        # B — Top 10% spenders
-          attribute: ""
-          source: behavior_pnr_leg
-          aggregation:
-            type: Sum
-            column: revenue_amount
-          operator:
-            type: GreaterEqual
-            value: 5000
-          timeWindow:
-            duration: 730
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
-                column: res_status_categ_cd
-                operator:
-                  type: Equal
-                  value: "K"
-        - type: Value                        # C — ≥1 web search
-          attribute: ""
-          source: behavior_web_all_events_stitched
-          aggregation:
-            type: Count
-          operator:
-            type: GreaterEqual
-            value: 1
-          timeWindow:
-            duration: 90
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
                 column: event_action_lh_sn
                 operator:
                   type: Equal
                   value: "submit"
               - type: Column
                 column: event_category_lh_sn
-                operator:
-                  type: In
-                  value: ["flma", "flightmanager"]
-        - type: Value                        # D — ≥1 app search
-          attribute: ""
-          source: behavior_web_all_events_stitched
-          aggregation:
-            type: Count
-          operator:
-            type: GreaterEqual
-            value: 1
-          timeWindow:
-            duration: 90
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
-                column: tealium_event
-                operator:
-                  type: Equal
-                  value: "click booking search button"
-
-    # Branch 4: Italian + Top spender + searches on different LH brand websites
-    - type: Composite
-      expr: "(A and B and C and D)"
-      conditions:
-        - type: Composite                    # A — Italian
-          expr: "(A or B)"
-          conditions:
-            - type: Value
-              attribute: cntry_cd
-              operator:
-                type: Equal
-                value: "it"
-            - type: Value
-              attribute: phone_cntry_cd
-              operator:
-                type: Equal
-                value: "+39"
-        - type: Value                        # B — Top 10% spenders
-          attribute: ""
-          source: behavior_pnr_leg
-          aggregation:
-            type: Sum
-            column: revenue_amount
-          operator:
-            type: GreaterEqual
-            value: 5000
-          timeWindow:
-            duration: 730
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
-                column: res_status_categ_cd
-                operator:
-                  type: Equal
-                  value: "K"
-        - type: Value                        # C — ≥1 search on LH/SN
-          attribute: ""
-          source: behavior_web_all_events_stitched
-          aggregation:
-            type: Count
-          operator:
-            type: GreaterEqual
-            value: 1
-          timeWindow:
-            duration: 90
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
-                column: event_action_lh_sn
-                operator:
-                  type: Equal
-                  value: "submit"
-              - type: Column
-                column: event_category_lh_sn
-                operator:
-                  type: In
-                  value: ["flma", "flightmanager"]
-        - type: Value                        # D — ≥1 search on LX/OS
-          attribute: ""
-          source: behavior_web_all_events_stitched
-          aggregation:
-            type: Count
-          operator:
-            type: GreaterEqual
-            value: 1
-          timeWindow:
-            duration: 90
-            unit: day
-          filter:
-            type: And
-            conditions:
-              - type: Column
-                column: event_action_lx_os
-                operator:
-                  type: Equal
-                  value: "submit"
-              - type: Column
-                column: event_category_lx_os
                 operator:
                   type: In
                   value: ["flma", "flightmanager"]
 ```
 
-**Key points in this example:**
-- Top level: `Composite` with `expr` using numbers (`"(1 or 2 or 3 or 4)"`) — OR of 4 branches
-- Each branch: `Composite` with `expr` using letters (`"(A and B and C)"`) — AND of conditions
-- Italian identification inside each branch: `Composite` with OR of 2 values (letters)
-- Behavior `filter.type: And` — safe, not affected by render bug
-- Maximum Composite depth: exactly 2 (top OR → branch AND → Italian OR)
-- Conditions that repeat (Italian, Top spender) are duplicated in each branch — this is required by DNF flattening
+**Key points:**
+- Top level: `Composite` with `expr: "(1 or 2)"` — numbers only
+- Each branch: `type: And` — NO `expr` field, NO `type: Composite`
+- The Italian OR (country vs phone) is flattened into 2 separate branches, each duplicating the shared conditions (top spender + web searcher)
+- Behavior `filter.type: And` inside each Value condition — safe, unaffected by nesting rules
+- Maximum depth: `Composite` → `And` → `Value` (exactly 2 levels, no deeper)
 
 ---
 
@@ -651,7 +537,7 @@ rule:
 | `MISSING_TIME_UNIT` | Time operator missing `unit` | Add `unit: day` (singular — not `days`) |
 | `INVALID_ARRAY_MATCHING` | `arrayMatching` has invalid format | Use `any`, `all`, or object form `{ atLeast: N }` |
 | `MISSING_SEGMENT_REFERENCE` | `include`/`exclude` missing `segment` field | Add `segment:` with exact server name |
-| `NESTED_CONDITION_GROUP` | Raw nested `And`/`Or` condition group (without `Composite`) | Use `type: Composite` with `expr`, or use `In` operator for same-attribute OR |
+| `NESTED_CONDITION_GROUP` | Nested `And`/`Or` inside another `And`/`Or` | Restructure: use `Composite` at rule level with `And`/`Or` branches, or use `In` operator for same-attribute OR |
 | `SEGMENT_SCHEMA_ERROR` | Server rejected the schema | Check field names — `column` (not `attribute`) inside `filter.conditions` |
 
 ---
@@ -676,14 +562,15 @@ Always run both validations before pushing. Local validation is fast; server val
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| Console shows blank/empty rules | Used `type: And` or `type: Or` inside a `conditions` array | Replace with `type: Composite` + `expr` |
-| HTTP 400 "Referenced rule set does not exist" | Used letters in top-level `expr` | Top-level `expr` must use numbers (`1`, `2`, `3`…); letters only inside nested Composite |
+| Console shows blank/empty rules | Used `type: And`/`Or` inside a top-level `And`/`Or` conditions array | At top-level `And`/`Or`, use `Composite` for grouping. Inside a top-level `Composite`, use `And`/`Or` for branches (see Section 6 & 11) |
+| HTTP 400 "Referenced rule set does not exist" | Used letters in top-level `expr`, or used `Composite` with `expr` inside a top-level `Composite` | Top-level `expr` must use numbers; branches must be `type: And`/`Or` without `expr` |
+| Nested Composite rejected by server | Put `type: Composite` with `expr` inside a top-level `Composite`'s conditions | Branches inside a top-level Composite must be `type: And` or `type: Or` — never `Composite` |
+| OR logic within a branch needed | Cannot nest `Or` inside an `And` branch | Flatten: create separate top-level branches for each OR path (see Section 11) |
 | Behavior condition not matching | Wrong `filter` condition type | Use `type: Column` with `column` (not `type: Value` with `attribute`) |
 | `filter.type: Or` validation error | OR not supported in behavior filter | `filter.type` must always be `And`; split OR branches into separate behavior conditions |
-| `NESTED_CONDITION_GROUP` error | Raw nested `And`/`Or` without `Composite` | Use `type: Composite` + `expr`, or `In` operator for same-attribute values |
+| `NESTED_CONDITION_GROUP` error | Nested `And`/`Or` inside another `And`/`Or` | Use `In` operator for same-attribute values, or restructure with `Composite` at rule level |
 | `MISSING_TIME_UNIT` | Plural time unit | Use singular: `day` not `days`, `month` not `months` |
 | `MISSING_BETWEEN_BOUNDS` | `Between` with no bounds | At least one of `min` or `max` required |
 | Segment reference not found on server | Name mismatch or segment not pushed | Segment must exist on server; verify exact name in TD Console |
-| Push slow or times out | Many Composite branches or long behavior windows | Use `include` for shared base conditions; use pre-computed attributes (e.g. `decile_monetary_24m`) instead of 730-day scans |
-| 3-level Composite depth | Logic not flattened before writing | Flatten to DNF (OR of AND-groups) so maximum depth is 2; see Section 11 |
+| Push slow or times out | Many branches or long behavior windows | Use `include` for shared base conditions; use pre-computed attributes (e.g. `decile_monetary_24m`) instead of 730-day scans |
 | Blank segment count | Rule too restrictive or wrong field name | Run a direct SQL query against `cdp_audience_1159510` with same conditions to debug |
