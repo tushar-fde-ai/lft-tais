@@ -79,6 +79,41 @@ tdx sg view "Segment Name"
 tdx sg sql "Segment Name"  # get the SQL
 ```
 
+### Fully-Qualified Table Names
+
+`tdx query` does NOT inherit parent segment context from `tdx ps use`. Always use fully-qualified table names in every query:
+
+```bash
+# WRONG — bare table names fail:
+tdx query "SHOW COLUMNS FROM customers"
+tdx query "SELECT COUNT(*) FROM behavior_pnr_data WHERE ..."
+
+# CORRECT — always qualify:
+tdx query "SHOW COLUMNS FROM cdp_audience_1159510.customers"
+tdx query "SELECT COUNT(*) FROM cdp_audience_1159510.behavior_pnr_data WHERE ..."
+```
+
+This applies to ALL `tdx query` calls: SHOW COLUMNS, SELECT, DESCRIBE, and any other SQL. The only exception is when using `--parent-segment` flag, which sets context for that call only.
+
+### Pre-Computed Attributes — Check Before Building Behavior Scans
+
+Before suggesting a behavior aggregation condition, check if a pre-computed attribute already covers the intent. Pre-computed attributes are instant — behavior scans over 730+ day windows are slow and increase segment push time significantly.
+
+Run `tdx ps fields "cdp_lhg_unified_first_party" --json` or `SHOW COLUMNS FROM cdp_audience_1159510.customers` to see all available pre-computed attributes.
+
+Key pre-computed attributes to check first:
+
+| User Intent | Pre-computed Attribute | Avoids |
+|------------|----------------------|--------|
+| Top 10% spender | `decile_monetary_24m = 10` | 730-day revenue Sum behavior scan |
+| High-value customer | `clv_3Y_4pct > 500` or `segment_1y IN (5, 6)` | Multi-year spend aggregation |
+| Purchase propensity | `purchase_propensity_band = 'hot'` | Recency/frequency behavior counts |
+| Elite M&M traveler | `curr_mbr_status_cd IN ('hon', 'sen')` | Flight count + cabin aggregation |
+| Corporate traveler | `corp_ind IN ('Y', 'y')` (lowercase 'y' exists — ~22% of corporate bookings) | corp_ind_staged behavior scan |
+| Flight searcher (pre-built) | `persona` column or macro audience flags | Full web event aggregation |
+
+When a pre-computed attribute is available, always prefer it over a behavior scan. Report both options to the user with a note on why the pre-computed one is faster.
+
 ## Data Quality Checks
 
 ### Null Ratio Check
