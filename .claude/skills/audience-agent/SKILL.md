@@ -81,6 +81,8 @@ Present the decomposed logic to the user: "Your request translates to: A AND (B 
 
 Invoke `lhg-policy` to load all segmentation rules before data discovery. This ensures rules are applied before any column or table is chosen.
 
+If the user request mentions any ancillary product — seats, seat reservations, bags/baggage, upgrades, lounges, pets, carbon offset, sports equipment, or ancillary revenue — also invoke `lhg-ancillary` at this step.
+
 ### Step 3: Data Source Discovery
 
 Invoke the `data-discovery` skill to:
@@ -259,6 +261,7 @@ When creating charts or dashboards, use this configuration:
 | Need | Invoke |
 |------|--------|
 | All segmentation rules, policy, review checklist | `lhg-policy` |
+| Ancillary product codes, triple filter, upgrade/lounge/pet/carbon rules | `lhg-ancillary` |
 | Find relevant columns, segments, explore schema | `data-discovery` |
 | Pre-built macro audience definitions | `macro-audiences` |
 | YAML format, operators, push workflow | `segment-lhg` |

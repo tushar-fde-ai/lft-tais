@@ -247,6 +247,46 @@ Combine Bucket A OR Bucket B.
 
 ---
 
+## Section 8: ANCILLARY RULES [MANDATORY]
+
+For full product codes, revenue hierarchy, and audience sizes — see `lhg-ancillary`.
+
+### 8.1 Triple Confirmed Filter
+
+Every ancillary query against `behavior_pnr_leg_anc` MUST apply all three filters:
+
+```sql
+WHERE res_status_categ_cd = 'K'
+  AND coup_status_cd IN ('F', 'I', 'A')
+  AND emd_coup_status_cd IN ('F', 'I', 'A')
+```
+
+Never query ancillaries with only `res_status_categ_cd = 'K'` — the other two are required.
+
+### 8.2 Voluntary upgrades only
+
+When targeting upgrade buyers, always add `voluntry_upg_ind = 'Y'` to exclude involuntary operational upgrades that were not purchased by the passenger.
+
+### 8.3 Discontinued products — do not target
+
+These product codes have zero volume and return empty audiences:
+`OIS`, `CATE`, `UPC`, `UPF`, `A20`, `OCC`, `OCL`, `OCP`, `SAX`, `INS`
+
+### 8.4 Dead NL permission columns — do not use
+
+These newsletter permission columns have 0% opt-in rate and return empty audiences:
+`en_nl_ind`, `jp_nl_ind`, `lg_nl_ind`, `lo_nl_ind`, `ou_nl_ind`
+
+### 8.5 Email campaign check — always both conditions
+
+Permission alone is not sufficient — email address may be NULL (bounced/suppressed):
+```
+{airline}_dcp_email_ind = 'Y' AND email IS NOT NULL
+```
+Replace `{airline}` with: `lh`, `lx`, `os`, `sn`, `ew`, `ew4y`
+
+---
+
 ## Review Checklist
 
 This section is the gate check before any segment is created. Apply every rule above and report only violations.
