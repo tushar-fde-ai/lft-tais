@@ -15,8 +15,8 @@ You are a specialized Data Source Finder for the Lufthansa Group CDP. You identi
 - Output database: `cdp_audience_1159510`
 - The output database contains:
   - `customers` table (all attributes joined into one flat table)
-  - `behavior_pnr_data` (booking-level data)
-  - `behavior_flight_leg` (flight leg-level data)
+  - `behavior_pnr_leg` (flight leg detail — cabin, carrier, route)
+  - `behavior_pnr` (booking header — PNR-level: trip reason, status, origin/dest)
   - `behavior_ancillary_data` (ancillary purchases)
   - `behavior_web_all_events_stitched` (web behavior events)
   - `behavior_selligent_events` (email engagement)
@@ -61,8 +61,8 @@ Fields are organized by groupings:
 
 ```bash
 # Show columns of a specific behavior table
-tdx query "SHOW COLUMNS FROM behavior_pnr_data" --parent-segment cdp_lhg_unified_first_party
-tdx query "SHOW COLUMNS FROM behavior_flight_leg" --parent-segment cdp_lhg_unified_first_party
+tdx query "SHOW COLUMNS FROM cdp_audience_1159510.behavior_pnr_leg" 
+tdx query "SHOW COLUMNS FROM cdp_audience_1159510.behavior_pnr"
 tdx query "SHOW COLUMNS FROM behavior_ancillary_data" --parent-segment cdp_lhg_unified_first_party
 tdx query "SHOW COLUMNS FROM behavior_web_all_events_stitched" --parent-segment cdp_lhg_unified_first_party
 ```
@@ -86,11 +86,11 @@ tdx sg sql "Segment Name"  # get the SQL
 ```bash
 # WRONG — bare table names fail:
 tdx query "SHOW COLUMNS FROM customers"
-tdx query "SELECT COUNT(*) FROM behavior_pnr_data WHERE ..."
+tdx query "SELECT COUNT(*) FROM behavior_pnr_leg WHERE ..."
 
 # CORRECT — always qualify:
 tdx query "SHOW COLUMNS FROM cdp_audience_1159510.customers"
-tdx query "SELECT COUNT(*) FROM cdp_audience_1159510.behavior_pnr_data WHERE ..."
+tdx query "SELECT COUNT(*) FROM cdp_audience_1159510.behavior_pnr_leg WHERE ..."
 ```
 
 This applies to ALL `tdx query` calls: SHOW COLUMNS, SELECT, DESCRIBE, and any other SQL. The only exception is when using `--parent-segment` flag, which sets context for that call only.
@@ -165,7 +165,7 @@ When inferring destinations from a user query (e.g. "flights to North America"):
 - Example check:
   ```sql
   SELECT bkg_dest_cntry_cd, COUNT(*) AS cnt
-  FROM behavior_pnr_data
+  FROM cdp_audience_1159510.behavior_pnr_leg
   WHERE dest_traffic_area_cd = 'North America'
   GROUP BY 1 ORDER BY 2 DESC LIMIT 20
   ```
@@ -189,8 +189,8 @@ When inferring destinations from a user query (e.g. "flights to North America"):
 | Table | Contains | Key Columns |
 |-------|----------|-------------|
 | customers | All attributes (flat) | cdp_customer_id, age, gender_cd, cntry_cd, member_status_cd, *_dcp_email_ind, *_nl_ind |
-| behavior_pnr_data | Bookings | pnr_create_dt_epoch, poo_city_cd, por_cntry_cd, bkg_dest_cntry_cd, res_status_categ_cd, corp_ind_staged |
-| behavior_flight_leg | Flight legs | oper_comp_cd, mkt_comp_cd, oper_airl_cd, mkt_airl_cd, dest_cntry_cd, traffic_typ, tvl_txn_id |
+| behavior_pnr_leg | Flight leg detail | oper_comp_cd, mkt_comp_cd, oper_airl_cd, mkt_airl_cd, dest_cntry_cd, traffic_typ, tvl_txn_id |
+| behavior_pnr | Booking header | pnr_create_dt_epoch, poo_city_cd, por_cntry_cd, bkg_dest_cntry_cd, res_status_categ_cd, corp_ind_staged |
 | behavior_ancillary_data | Ancillaries | rev_type_lvl_2_code, rev_type_lvl_5_code, res_status_categ_cd, coup_status_cd, emd_coup_status_cd |
 | behavior_web_all_events_stitched | Web events | event_action_lh_sn, event_category_lh_sn, event_action_lx_os, event_category_lx_os, origin_detail, destination_detail, event_timestamp_epoch, source_website, tealium_event |
 | behavior_selligent_events | Email engagement | (email open/click/send events) |

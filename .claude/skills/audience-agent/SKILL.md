@@ -38,8 +38,8 @@ When handling requests, prioritize:
 - Output database: `cdp_audience_1159510`
 - Key data tables:
   - `customers` — customer attributes (demographics, permissions, loyalty)
-  - `behavior_pnr_data` — booking-level data (PNR records, status, trip reason)
-  - `behavior_flight_leg` — individual flight legs (cabin, carrier, route)
+  - `behavior_pnr_leg` — flight leg detail (cabin, carrier, route, leg destination)
+  - `behavior_pnr` — booking header (PNR-level: trip reason, booking status, origin/dest)
   - `behavior_ancillary_data` — ancillary purchases (seats, bags, upgrades, lounges)
   - `behavior_web_all_events_stitched` — web interaction events (searches, clicks)
 
@@ -163,7 +163,7 @@ Result: `(A AND C) OR (B AND C)` — valid, one level of nesting.
 
 Decomposition:
 - A: Country = DE (customers table)
-- B: Booked Premium Economy to Asia (booking: cabin = W, dest_traffic_area = Asia, status = K)
+- B: Booked Premium Economy to Asia (booking: cabin = E, dest_traffic_area = Asia, status = K)
 - C: Miles & More Gold (customers: loyalty tier)
 - D: Searched Asian destinations (web: destination in Asia)
 

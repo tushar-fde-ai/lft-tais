@@ -39,16 +39,18 @@ description: Single source of truth for all LHG segmentation rules and policy. L
 
 ### 2.1 When to use each table
 
-**Bookings table (`behavior_pnr_data`) — booking-level:**
+**Bookings table (`behavior_pnr_leg`) — booking-level:**
 - Trip reason, origin & destination of booking, booking status
 - Aggregation: COUNT
 
-**Flight_Leg table (`behavior_flight_leg`) — flight leg level:**
+**Flight_Leg table (`behavior_pnr_leg`) — flight leg level:**
 - Cabin, leg destination, operating carrier, any attribute at individual leg level
 - Aggregation: COUNT_DISTINCT by tvl_txn_id
 
-Rule: whole booking attributes = Bookings (COUNT). Flight leg attributes = Flight_Leg (COUNT_DISTINCT).
-Prefer `behavior_flight_leg` over `behavior_pnr_data` unless a booking-level attribute is specifically needed.
+> **Note:** The booking header table is `behavior_pnr` (PNR-level summary). The flight leg detail table is `behavior_pnr_leg`. There is no `behavior_pnr_data` or `behavior_flight_leg` table in `cdp_audience_1159510` — these names do not exist and queries against them will fail silently.
+
+Rule: whole booking attributes = Bookings (`behavior_pnr`, COUNT). Flight leg attributes = Flight_Leg (`behavior_pnr_leg`, COUNT_DISTINCT by tvl_txn_id).
+Prefer `behavior_pnr_leg` over `behavior_pnr` unless a booking-level attribute is specifically needed.
 
 ### 2.2 Origin & Destination field mapping
 - `airpt` in column name = Bookings table; `airport` = Flight_Leg table
@@ -64,7 +66,7 @@ Prefer `behavior_flight_leg` over `behavior_pnr_data` unless a booking-level att
 - Validate with:
   ```sql
   SELECT bkg_dest_cntry_cd, COUNT(*)
-  FROM cdp_audience_1159510.behavior_pnr_data
+  FROM cdp_audience_1159510.behavior_pnr_leg
   WHERE dest_traffic_area_cd = '<area>'
   GROUP BY 1
   ORDER BY 2 DESC
@@ -134,7 +136,8 @@ Always run `tdx ps fields "cdp_lhg_unified_first_party"` and check for pre-compu
 
 ### 4.3 Always combine operating OR marketing cabin class
 - `oper_comp_cd = <class> OR mkt_comp_cd = <class>`
-- Cabin class codes: C = Business, F = First, W = Premium Economy, M = Economy
+- Cabin class codes: C = Business, F = First, E = Premium Economy, M = Economy
+  (**NOT W** — W does not exist as a cabin code in LHG data)
 
 ### 4.4 Query pattern example
 ```
@@ -188,7 +191,8 @@ origin_detail is <origin> / IS NOT NULL
 destination_detail is <destination> / IS NOT NULL
 event_action_lh_sn is "submit"
 event_category_lh_sn is IN ("flma", "flightmanager")
-source_website is "lufthansa"
+source_website is "lufthansa"   # valid values: "lufthansa", "swiss", "austrian", "brusselsairlines"
+                                  # NOTE: "brussels" is WRONG — must be "brusselsairlines"
 Count >= 1
 ```
 

@@ -468,10 +468,12 @@ where a."age" between 18 and 29
 - Airport code lists for "Broad" audiences should be adapted per destination country
 
 **Database Adaptation:**
-- All SQL above references `cdp_audience_841858` (older output DB)
-- When executing, replace with current: `cdp_audience_1159510`
-- Column names remain the same across both databases
-- Table structure: `customers` (profile), `behavior_pnr_data` (bookings), `behavior_web_all_events_stitched` (web)
+- All SQL above references `cdp_audience_841858` (older output DB) — `behavior_pnr_data` is valid there
+- When executing against the current DB `cdp_audience_1159510`, replace:
+  - `behavior_pnr_data` → `behavior_pnr_leg` (flight leg detail) or `behavior_pnr` (booking header)
+  - `behavior_flight_leg` → `behavior_pnr_leg`
+  - See `lhg-policy §2.1` for which table to use
+- Column names are largely the same across both databases
 
 **Validation:**
 - Always run through `segment-review` before creating
