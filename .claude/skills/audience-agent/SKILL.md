@@ -163,7 +163,7 @@ Result: `(A AND C) OR (B AND C)` — valid, one level of nesting.
 
 Decomposition:
 - A: Country = DE (customers table)
-- B: Booked Premium Economy to Asia (booking: cabin = E, dest_traffic_area = Asia, status = K)
+- B: Booked Premium Economy to Asia (booking: cabin = E or W — verify against live data, dest_traffic_area = Asia, status = K)
 - C: Miles & More Gold (customers: loyalty tier)
 - D: Searched Asian destinations (web: destination in Asia)
 

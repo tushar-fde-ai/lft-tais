@@ -136,8 +136,8 @@ Always run `tdx ps fields "cdp_lhg_unified_first_party"` and check for pre-compu
 
 ### 4.3 Always combine operating OR marketing cabin class
 - `oper_comp_cd = <class> OR mkt_comp_cd = <class>`
-- Cabin class codes: C = Business, F = First, E = Premium Economy, M = Economy
-  (**NOT W** — W does not exist as a cabin code in LHG data)
+- Cabin class codes: C = Business, F = First, M = Economy
+  (**Premium Economy**: verify the correct code against live data — `E` and `W` are both used in different LHG contexts; run `SELECT DISTINCT mkt_comp_cd FROM cdp_audience_1159510.behavior_pnr_leg LIMIT 20` to confirm)
 
 ### 4.4 Query pattern example
 ```
