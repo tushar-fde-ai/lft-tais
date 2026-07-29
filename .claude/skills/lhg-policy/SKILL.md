@@ -39,18 +39,16 @@ description: Single source of truth for all LHG segmentation rules and policy. L
 
 ### 2.1 When to use each table
 
-**Bookings table — booking-level:**
+**Bookings table (`behavior_pnr_data`) — booking-level:**
 - Trip reason, origin & destination of booking, booking status
 - Aggregation: COUNT
 
-**Flight_Leg table — flight leg level:**
+**Flight_Leg table (`behavior_flight_leg`) — flight leg level:**
 - Cabin, leg destination, operating carrier, any attribute at individual leg level
 - Aggregation: COUNT_DISTINCT by tvl_txn_id
 
-> **Warning:** Table names in `cdp_audience_1159510` differ from the older `cdp_audience_841858` database. Do NOT assume `behavior_pnr_data` or `behavior_flight_leg` — these may not exist. Always verify with `tdx query "SHOW TABLES IN cdp_audience_1159510"` before building behavior conditions.
-
 Rule: whole booking attributes = Bookings (COUNT). Flight leg attributes = Flight_Leg (COUNT_DISTINCT by tvl_txn_id).
-Prefer the Flight_Leg table over the Bookings table unless a booking-level attribute is specifically needed.
+Prefer `behavior_flight_leg` over `behavior_pnr_data` unless a booking-level attribute is specifically needed.
 
 ### 2.2 Origin & Destination field mapping
 - `airpt` in column name = Bookings table; `airport` = Flight_Leg table
@@ -136,8 +134,7 @@ Always run `tdx ps fields "cdp_lhg_unified_first_party"` and check for pre-compu
 
 ### 4.3 Always combine operating OR marketing cabin class
 - `oper_comp_cd = <class> OR mkt_comp_cd = <class>`
-- Cabin class codes: C = Business, F = First, M = Economy
-  (**Premium Economy**: verify the correct code against live data — `E` and `W` are both used in different LHG contexts; run `SELECT DISTINCT mkt_comp_cd FROM cdp_audience_1159510.behavior_pnr_leg LIMIT 20` to confirm)
+- Cabin class codes: C = Business, F = First, W = Premium Economy, M = Economy
 
 ### 4.4 Query pattern example
 ```
@@ -191,8 +188,7 @@ origin_detail is <origin> / IS NOT NULL
 destination_detail is <destination> / IS NOT NULL
 event_action_lh_sn is "submit"
 event_category_lh_sn is IN ("flma", "flightmanager")
-source_website is "lufthansa"   # valid values: "lufthansa", "swiss", "austrian", "brusselsairlines"
-                                  # NOTE: "brussels" is WRONG — must be "brusselsairlines"
+source_website is "lufthansa"
 Count >= 1
 ```
 

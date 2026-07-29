@@ -470,8 +470,8 @@ where a."age" between 18 and 29
 **Database Adaptation:**
 - All SQL above references `cdp_audience_841858` (older output DB)
 - When executing, replace with current: `cdp_audience_1159510`
-- ⚠️ Verify actual table names with `tdx query "SHOW TABLES IN cdp_audience_1159510"` — table names may differ between the old and current database
-- Column names are largely the same across both databases
+- Column names remain the same across both databases
+- Table structure: `customers` (profile), `behavior_pnr_data` (bookings), `behavior_web_all_events_stitched` (web)
 
 **Validation:**
 - Always run through `segment-review` before creating
